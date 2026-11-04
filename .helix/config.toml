@@ -1,0 +1,7 @@
+[editor]
+line-number = "relative"
+bufferline = "multiple"
+true-color = true
+
+[editor.lsp]
+display-messages = true

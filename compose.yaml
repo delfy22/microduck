@@ -1,4 +1,21 @@
 services:
+  dev:
+    profiles: [dev]
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    image: localhost/microduck-dev:latest
+    environment:
+      TERM: ${TERM:-xterm-256color}
+      COLORTERM: truecolor
+      DUCK_SIM_STATE: /var/lib/duck-sim
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    volumes:
+      - .:/workspace
+      - sim-state:/var/lib/duck-sim
+      - sim-target:/workspace/3rd_party/microduck/target
+    stdin_open: true
+    tty: true
   sim:
     build: .
     image: localhost/microduck-sim:latest

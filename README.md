@@ -2,6 +2,8 @@
 
 Development towards ROS 2, mapping and navigation is tracked in the
 [ROS 2 integration roadmap](docs/ros2-roadmap.md).
+The [Helix development guide](docs/development.md) covers the ROS 2 editor and
+toolchain container for C++, Python and YAML.
 
 Build the Rust daemons and run them against the MuJoCo body from the two pinned
 submodules. Requires Linux, Docker with Compose (or Podman with podman-compose),

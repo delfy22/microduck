@@ -1,0 +1,74 @@
+#!/bin/bash
+set -e
+
+# Use disposable sources to check the installed toolchain without adding a demo
+# robot package to the workspace. Run inside the development container.
+source /opt/ros/lyrical/setup.bash
+check_dir=$(mktemp -d)
+trap 'rm -rf "$check_dir"' EXIT
+mkdir -p "$check_dir/src/editor_check"
+cat > "$check_dir/src/editor_check/package.xml" <<'XML'
+<package format="3">
+  <name>editor_check</name><version>0.0.0</version>
+  <description>Development environment check</description>
+  <maintainer email="dev@example.invalid">Developer</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend><depend>nav_msgs</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>
+XML
+cat > "$check_dir/src/editor_check/CMakeLists.txt" <<'CMAKE'
+cmake_minimum_required(VERSION 3.20)
+project(editor_check)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(nav_msgs REQUIRED)
+add_executable(editor_check main.cpp)
+target_link_libraries(editor_check rclcpp::rclcpp ${nav_msgs_TARGETS})
+ament_package()
+CMAKE
+cat > "$check_dir/src/editor_check/main.cpp" <<'CPP'
+#include <rclcpp/rclcpp.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+int main(int argc, char **argv) {
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<rclcpp::Node>("editor_check");
+  auto publisher = node->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+  rclcpp::shutdown();
+}
+CPP
+(
+    cd "$check_dir"
+    colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    test -s build/compile_commands.json
+    clangd --check=src/editor_check/main.cpp --compile-commands-dir=build --log=error
+)
+
+python3 - <<'PY'
+import jedi
+import rclpy
+import tomllib
+from pathlib import Path
+from nav_msgs.msg import Odometry
+
+source = "import rclpy\nrclpy.init()\n"
+definitions = jedi.Script(source, path="/workspace/ros2_ws/src/editor_check.py").goto(
+    2, 8, follow_imports=True
+)
+assert any("/opt/ros/lyrical/" in str(d.module_path) for d in definitions), definitions
+assert Odometry().header.frame_id == ""
+for path in Path("/workspace/.helix").glob("*.toml"):
+    tomllib.loads(path.read_text())
+print("ROS Python imports and language-server definition lookup passed:", rclpy.__file__)
+PY
+
+for language in cpp python yaml docker-compose; do
+    hx --health "$language"
+done
+for server in clangd pylsp yaml-language-server; do
+    command -v "$server"
+done
+shellcheck -x -e SC1091 /workspace/docker/dev-entrypoint.sh \
+    /workspace/scripts/ros-build /workspace/scripts/check-dev-env
+yamllint -d '{extends: relaxed, rules: {line-length: disable}}' /workspace/compose.yaml

@@ -1,0 +1,38 @@
+[language-server.clangd]
+command = "clangd"
+args = ["--background-index", "--compile-commands-dir=/workspace/ros2_ws/build"]
+
+[[language]]
+name = "cpp"
+language-servers = ["clangd"]
+auto-format = false
+
+[[language]]
+name = "c"
+language-servers = ["clangd"]
+auto-format = false
+
+[[language]]
+name = "python"
+language-servers = ["pylsp"]
+auto-format = false
+
+[language-server.pylsp.config.pylsp.plugins]
+pycodestyle = { enabled = false }
+autopep8 = { enabled = true }
+
+[[language]]
+name = "yaml"
+language-servers = ["yaml-language-server"]
+auto-format = false
+indent = { tab-width = 2, unit = "  " }
+
+[[language]]
+name = "docker-compose"
+language-servers = ["yaml-language-server"]
+auto-format = false
+
+[language-server.yaml-language-server.config.yaml]
+format = { enable = true }
+validate = true
+keyOrdering = false

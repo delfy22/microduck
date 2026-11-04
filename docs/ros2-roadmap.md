@@ -44,14 +44,20 @@ Teleoperation / Nav2 -- cmd_vel --> ROS bridge -- robot.move --> robotd
 - [x] Control the same duck from temporary containers through shared sockets.
 - [x] Make `drive`, `status` and `realtime` work across container boundaries.
 - [x] Establish development rules in the root `AGENTS.md`.
-- [ ] Provide a Helix development container with ROS 2 Lyrical dependencies.
-- [ ] Verify C++, Python and YAML language support and ROS dependency navigation.
-- [ ] Document editing, building and checking the workspace.
+- [x] Provide a Helix development container with ROS 2 Lyrical dependencies.
+- [x] Verify C++, Python and YAML language support and ROS dependency navigation.
+- [x] Document editing, building and checking the workspace.
 
 Evidence: the existing simulation has run at 1.00× real time with a healthy 50 Hz
 control loop. A temporary client successfully drove it 59 cm over an eight-second
 test. Bringup and shared access are committed in the main repository and the
 `microduck` submodule.
+
+Development environment verified on 4 November 2026: Helix 25.07.1 in the Lyrical
+container; disposable ROS C++ compilation and clangd checks passed; Python/Jedi
+resolved `rclpy` definitions; the interactive YAML language server reported no
+Compose diagnostics. The development container also reached the running duck.
+See the [development guide](development.md) and `scripts/check-dev-env`.
 
 ## Milestone 1 — ROS control and sensor visualisation
 
