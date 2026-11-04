@@ -1,5 +1,8 @@
 # Microduck simulation container
 
+Development towards ROS 2, mapping and navigation is tracked in the
+[ROS 2 integration roadmap](docs/ros2-roadmap.md).
+
 Build the Rust daemons and run them against the MuJoCo body from the two pinned
 submodules. Requires Linux, Docker with Compose (or Podman with podman-compose),
 an X11 or XWayland desktop, and an Intel/AMD GPU exposed at `/dev/dri`.
