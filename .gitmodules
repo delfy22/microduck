@@ -1,0 +1,6 @@
+[submodule "3rd_party/microduck"]
+	path = 3rd_party/microduck
+	url = git@github.com:pollen-robotics/microduck.git
+[submodule "3rd_party/microduck_rl"]
+	path = 3rd_party/microduck_rl
+	url = git@github.com:pollen-robotics/microduck_rl.git
