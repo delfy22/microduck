@@ -1,0 +1,35 @@
+services:
+  sim:
+    build: .
+    image: localhost/microduck-sim:latest
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      XAUTHORITY: /tmp/sim.xauth
+      LIBGL_ALWAYS_SOFTWARE: "0"
+      DUCK_SIM_VIEWER: ${DUCK_SIM_VIEWER:-1}
+      DUCK_SIM_SCENE: ${DUCK_SIM_SCENE:-backlash}
+      CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-4}
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - .:/workspace
+      - sim-target:/workspace/3rd_party/microduck/target
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - sim-state:/var/lib/duck-sim
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - ${XAUTHORITY:?Set XAUTHORITY to your desktop X11 authority file}:/tmp/host.xauth:ro
+    shm_size: 256mb
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "scripts/duck-sim", "ctl", "health"]
+      interval: 15s
+      timeout: 10s
+      start_period: 5m
+      retries: 3
+
+volumes:
+  sim-target:
+  cargo-registry:
+  cargo-git:
+  sim-state:
