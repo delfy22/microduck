@@ -23,6 +23,12 @@ RUN case "$(dpkg --print-architecture)" in \
     && rm /tmp/helix.tar.xz
 RUN npm install --global yaml-language-server@1.18.0 && npm cache clean --force
 
+# C++ bridge dependencies and the local visualisation transport.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nlohmann-json3-dev ros-lyrical-ament-cmake-gtest \
+    ros-lyrical-visualization-msgs ros-lyrical-foxglove-bridge \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV HELIX_RUNTIME=/opt/helix/runtime \
     EDITOR=hx \
     VISUAL=hx \

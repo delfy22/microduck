@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""Check live ROS bridge output; motion tests require an explicit opt-in.
+
+Run inside the ROS development container after building and sourcing the workspace.
+The default run is read-only. ``--motion`` sends low-speed forward and left-turn
+commands, then a zero command; it never enables or resets the robot.
+"""
+
+import argparse
+import math
+import socket
+import threading
+import time
+
+import rclpy
+from geometry_msgs.msg import TwistStamped
+from nav_msgs.msg import Odometry
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.time import Time
+from sensor_msgs.msg import JointState, PointCloud2
+from sensor_msgs_py import point_cloud2
+from tf2_ros import Buffer, TransformException, TransformListener
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--timeout", type=float, default=12.0,
+                        help="seconds to collect required live topics (default: 12)")
+    parser.add_argument("--motion", action="store_true",
+                        help="opt in to a brief conservative forward and left-turn test")
+    parser.add_argument("--robot-socket", default="/var/lib/duck-sim/duck-a.sock",
+                        help="robotd Unix socket (default: /var/lib/duck-sim/duck-a.sock)")
+    return parser.parse_args()
+
+
+class StateTap:
+    """Read robotd's JSON-RPC NDJSON state stream on a dedicated connection."""
+
+    def __init__(self, path):
+        self.path = path
+        self.latest = None
+        self.error = None
+        self.thread = threading.Thread(target=self._read, daemon=True)
+        self.thread.start()
+
+    def _read(self):
+        import json
+
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                connection.settimeout(2.0)
+                connection.connect(self.path)
+                stream = connection.makefile("rwb", buffering=0)
+                stream.write(
+                    b'{"jsonrpc":"2.0","id":1,"method":"robot.subscribe","params":{"hz":20}}\n')
+                while True:
+                    line = stream.readline()
+                    if not line:
+                        raise RuntimeError("robotd state connection closed")
+                    message = json.loads(line)
+                    if message.get("method") == "robot.state":
+                        self.latest = message.get(
+                            "params", message.get("result"))
+        except Exception as error:  # surfaced by the motion check
+            self.error = error
+
+
+class Acceptance(Node):
+    def __init__(self):
+        super().__init__("microduck_ros_bridge_acceptance")
+        self.latest = {}
+        self.counts = {"odom": 0, "imu": 0, "joints": 0, "tof": 0}
+        self.valid_tof = None
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.create_subscription(
+            Odometry, "/odom", self._odom, qos_profile_sensor_data)
+        from sensor_msgs.msg import Imu
+        self.create_subscription(
+            Imu, "/imu/data", self._imu, qos_profile_sensor_data)
+        self.create_subscription(
+            JointState, "/joint_states", self._joints, qos_profile_sensor_data)
+        self.create_subscription(
+            PointCloud2, "/tof/points", self._tof, qos_profile_sensor_data)
+
+    @staticmethod
+    def _stamp_seconds(stamp):
+        return stamp.sec + stamp.nanosec * 1e-9
+
+    def _record(self, key, message):
+        self.latest[key] = message
+        self.counts[key] += 1
+
+    def _odom(self, msg):
+        self._record("odom", msg)
+
+    def _imu(self, msg):
+        self._record("imu", msg)
+
+    def _joints(self, msg):
+        self._record("joints", msg)
+
+    def _tof(self, msg):
+        self._record("tof", msg)
+        points = list(point_cloud2.read_points(
+            msg, field_names=("x", "y", "z"), skip_nans=True))
+        if points:
+            self.valid_tof = (msg, points)
+
+    def spin_for(self, seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            rclpy.spin_once(self, timeout_sec=min(0.1, end - time.monotonic()))
+
+    def check_frame(self, key):
+        msg = self.latest[key]
+        stamp = self._stamp_seconds(msg.header.stamp)
+        now = self.get_clock().now().nanoseconds * 1e-9
+        assert stamp > 0 and abs(
+            now - stamp) < 5.0, f"{key} timestamp is implausible: {stamp}"
+        assert msg.header.frame_id, f"{key} frame_id is empty"
+
+    def check_tf(self):
+        cloud = self.valid_tof[0]
+        stamp = Time.from_msg(cloud.header.stamp)
+        deadline = time.monotonic() + 2.0
+        last_error = None
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.05)
+            try:
+                for target, source in (("odom", "base_footprint"),
+                                       ("base_footprint", "base_link"),
+                                       ("base_link", cloud.header.frame_id)):
+                    self.tf_buffer.lookup_transform(target, source, stamp)
+                return
+            except TransformException as error:
+                last_error = error
+        raise AssertionError(
+            f"TF chain unavailable at ToF timestamp: {last_error}")
+
+    def validate(self):
+        required = ("odom", "imu", "joints", "tof")
+        missing = [name for name in required if self.counts[name] < 2]
+        assert not missing, f"fewer than two messages received for: {', '.join(missing)}"
+        for key in required:
+            self.check_frame(key)
+        joints = self.latest["joints"]
+        assert len(joints.name) == len(
+            joints.position), "JointState names/positions lengths differ"
+        assert len(joints.name) > 0, "JointState contains no joints"
+        assert not joints.velocity or len(joints.velocity) == len(joints.name), \
+            "JointState velocity length differs"
+        assert all(math.isfinite(value)
+                   for value in joints.position), "JointState has non-finite positions"
+        assert all(math.isfinite(value)
+                   for value in joints.velocity), "JointState has non-finite velocities"
+        odom = self.latest["odom"]
+        pose = odom.pose.pose
+        assert all(math.isfinite(value) for value in
+                   (pose.position.x, pose.position.y, pose.position.z,
+                    pose.orientation.x, pose.orientation.y, pose.orientation.z,
+                    pose.orientation.w)), "odometry contains non-finite pose values"
+        imu = self.latest["imu"]
+        assert all(math.isfinite(value) for value in
+                   (imu.orientation.x, imu.orientation.y, imu.orientation.z,
+                    imu.orientation.w, imu.angular_velocity.x,
+                    imu.angular_velocity.y, imu.angular_velocity.z)), "IMU contains non-finite values"
+        assert self.valid_tof is not None, "ToF point clouds contained no valid returns"
+        cloud, points = self.valid_tof
+        assert cloud.height > 0 and cloud.width > 0, "ToF point cloud has no geometry metadata"
+        assert {"x", "y", "z"}.issubset(
+            {field.name for field in cloud.fields}), "ToF cloud lacks XYZ fields"
+        assert all(math.isfinite(float(value)) for point in points for value in point), \
+            "ToF cloud has non-finite coordinates"
+        self.check_tf()
+
+
+def read_move(state):
+    movement = state.get("move", {}) if isinstance(state, dict) else {}
+    return movement.get("requested"), movement.get("applied")
+
+
+def motion_check(node, publisher, tap):
+    state_deadline = time.monotonic() + 3.0
+    while tap.latest is None and tap.error is None and time.monotonic() < state_deadline:
+        rclpy.spin_once(node, timeout_sec=0.1)
+    assert tap.latest is not None, f"no robot.state received ({tap.error or 'subscription pending'})"
+
+    def publish(vx, vyaw, duration):
+        end = time.monotonic() + duration
+        while time.monotonic() < end:
+            message = TwistStamped()
+            message.header.stamp = node.get_clock().now().to_msg()
+            message.header.frame_id = "base_link"
+            message.twist.linear.x = vx
+            message.twist.angular.z = vyaw
+            publisher.publish(message)
+            rclpy.spin_once(node, timeout_sec=0.1)
+            time.sleep(0.1)
+
+    def check_axis(vx, vyaw, duration, axis, label):
+        publish(vx, vyaw, duration)
+        requested, applied = read_move(tap.latest or {})
+        assert requested and math.isfinite(requested[axis]) and requested[axis] > 0, \
+            f"{label} requested axis/sign mismatch: {requested}"
+        other_axis = 2 if axis == 0 else 0
+        assert abs(
+            requested[other_axis]) < 1e-6, f"{label} affected the wrong axis: {requested}"
+        assert abs(
+            requested[1]) < 1e-6, f"{label} requested lateral velocity: {requested}"
+        assert applied and all(math.isfinite(value) for value in applied), \
+            f"{label} applied values are invalid: {applied}"
+        assert abs(
+            applied[axis]) <= 0.5, f"{label} applied value exceeds conservative bound: {applied}"
+        if abs(applied[axis]) > 1e-6:
+            assert applied[axis] > 0, f"{label} applied axis/sign mismatch: {applied}"
+
+    try:
+        check_axis(0.15, 0.0, 1.5, 0, "forward")
+        check_axis(0.0, 0.15, 1.0, 2, "positive yaw")
+        # Stop publishing. The bridge's freshness timeout must clear the daemon request.
+        time.sleep(0.7)
+        requested, _ = read_move(tap.latest or {})
+        assert requested and all(abs(value) < 1e-6 for value in requested), \
+            f"robot did not stop after command timeout: {requested}"
+        time.sleep(1.0)
+        requested, _ = read_move(tap.latest or {})
+        assert requested and all(abs(value) < 1e-6 for value in requested), \
+            f"stale command replayed after timeout: {requested}"
+    finally:
+        # Leave the daemon with an explicit zero even if a later assertion fails.
+        publish(0.0, 0.0, 0.2)
+
+
+def main():
+    args = parse_args()
+    if args.timeout <= 0:
+        raise SystemExit("--timeout must be positive")
+    rclpy.init(args=[])
+    node = Acceptance()
+    publisher = node.create_publisher(
+        TwistStamped, "/cmd_vel", 10) if args.motion else None
+    tap = StateTap(args.robot_socket) if args.motion else None
+    try:
+        deadline = time.monotonic() + args.timeout
+        while time.monotonic() < deadline and (
+                any(count < 2 for count in node.counts.values()) or node.valid_tof is None):
+            rclpy.spin_once(node, timeout_sec=0.1)
+        node.validate()
+        print("PASS: live ROS topics, ToF returns, timestamps and TF are valid")
+        if args.motion:
+            motion_check(node, publisher, tap)
+            print("PASS: forward/positive-yaw axes and stop behaviour verified")
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
