@@ -1,0 +1,13 @@
+.git
+.containers
+**/.git
+**/.venv
+**/target
+**/__pycache__
+**/.pytest_cache
+**/.cache
+**/logs
+**/wandb
+.aws
+.codex
+.agents
