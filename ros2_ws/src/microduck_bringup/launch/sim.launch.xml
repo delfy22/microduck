@@ -1,0 +1,27 @@
+<launch>
+  <arg name="robot_socket" default="/var/lib/duck-sim/duck-a.sock"/>
+  <arg name="tof_socket" default="/var/lib/duck-sim/duck-a-tof.sock"/>
+  <arg name="command_timeout_sec" default="0.25"/>
+  <arg name="max_forward_speed_mps" default="0.20"/>
+  <arg name="max_yaw_rate_radps" default="1.0"/>
+  <arg name="state_timeout_sec" default="0.25"/>
+  <arg name="tof_timeout_sec" default="0.5"/>
+  <arg name="foxglove_port" default="8765"/>
+  <arg name="foxglove_address" default="0.0.0.0"/>
+
+  <node pkg="microduck_ros_bridge" exec="microduck_bridge" name="microduck_bridge" output="screen">
+    <param name="use_sim_time" value="false"/>
+    <param name="robot_socket" value="$(var robot_socket)"/>
+    <param name="tof_socket" value="$(var tof_socket)"/>
+    <param name="command_timeout_sec" value="$(var command_timeout_sec)"/>
+    <param name="max_forward_speed_mps" value="$(var max_forward_speed_mps)"/>
+    <param name="max_yaw_rate_radps" value="$(var max_yaw_rate_radps)"/>
+    <param name="state_timeout_sec" value="$(var state_timeout_sec)"/>
+    <param name="tof_timeout_sec" value="$(var tof_timeout_sec)"/>
+  </node>
+
+  <include file="$(find-pkg-share foxglove_bridge)/launch/foxglove_bridge_launch.xml">
+    <arg name="port" value="$(var foxglove_port)"/>
+    <arg name="address" value="$(var foxglove_address)"/>
+  </include>
+</launch>

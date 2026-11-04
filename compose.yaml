@@ -1,4 +1,24 @@
 services:
+  bridge:
+    profiles: [ros]
+    image: localhost/microduck-dev:latest
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    command: [ros2, launch, microduck_bringup, sim.launch.xml]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    volumes:
+      - .:/workspace
+      - sim-state:/var/lib/duck-sim
+    ports:
+      - "127.0.0.1:8765:8765"
+    stop_grace_period: 10s
+  lichtblick:
+    profiles: [ros]
+    image: ghcr.io/lichtblick-suite/lichtblick@sha256:285adff96f24c80b511cf159e97e5395a6b154126c70c62d1199456009de07cc
+    ports:
+      - "127.0.0.1:8080:8080"
   dev:
     profiles: [dev]
     build:

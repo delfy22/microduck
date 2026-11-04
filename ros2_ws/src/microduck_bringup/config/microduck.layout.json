@@ -1,0 +1,93 @@
+{
+  "configById": {
+    "3D!microduck": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 3,
+        "phi": 60,
+        "thetaOffset": 0,
+        "targetOffset": [0, 0, 0],
+        "fovy": 45,
+        "near": 0.01,
+        "far": 100
+      },
+      "followMode": "follow-pose",
+      "followTf": "base_footprint",
+      "scene": {"transforms": {"labelSize": 0.035}},
+      "topics": {
+        "/tof/points": {"visible": true, "pointSize": 6, "colorMode": "flat", "color": "#43d9ff"},
+        "/robot_markers": {"visible": true},
+        "/odom": {"visible": true},
+        "/tf": {"visible": true},
+        "/tf_static": {"visible": true}
+      },
+      "transforms": {
+        "frame:odom": {"visible": true},
+        "frame:base_footprint": {"visible": true},
+        "frame:base_link": {"visible": true},
+        "frame:tof": {"visible": true},
+        "frame:camera": {"visible": true}
+      },
+      "layers": {
+        "microduck-grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "microduck-grid",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "order": 1,
+          "frameId": "odom"
+        }
+      }
+    },
+    "Plot!joints": {
+      "paths": [
+        {"value": "/joint_states.position[0]", "enabled": true, "timestampMethod": "headerStamp"},
+        {"value": "/joint_states.position[1]", "enabled": true, "timestampMethod": "headerStamp"},
+        {"value": "/joint_states.position[2]", "enabled": true, "timestampMethod": "headerStamp"}
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "xAxisVal": "timestamp",
+      "timeRange": "latest",
+      "timeWindowMode": "sliding",
+      "followingViewWidth": 20
+    },
+    "RawMessages!diagnostics": {"topicPath": "/diagnostics", "fontSize": 14},
+    "RawMessages!odom": {"topicPath": "/odom", "fontSize": 14},
+    "RawMessages!imu": {"topicPath": "/imu/data", "fontSize": 14}
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "linkedGlobalVariables": [],
+  "playbackConfig": {"speed": 1},
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": "3D!microduck",
+      "second": {
+        "direction": "row",
+        "first": "Plot!joints",
+        "second": "RawMessages!diagnostics",
+        "splitPercentage": 55
+      },
+      "splitPercentage": 68
+    },
+    "second": {
+      "direction": "column",
+      "first": "RawMessages!odom",
+      "second": "RawMessages!imu",
+      "splitPercentage": 50
+    },
+    "splitPercentage": 78
+  }
+}

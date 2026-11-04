@@ -63,14 +63,14 @@ See the [development guide](development.md) and `scripts/check-dev-env`.
 
 ### Bridge and control
 
-- [ ] Create `microduck_ros_bridge` and `microduck_bringup` packages.
-- [ ] Subscribe to daemon state and ToF streams, with reconnect handling.
-- [ ] Translate `TwistStamped` commands to `robot.move`: x in m/s, yaw in rad/s,
+- [x] Create `microduck_ros_bridge` and `microduck_bringup` packages.
+- [x] Subscribe to daemon state and ToF streams, with reconnect handling.
+- [x] Translate `TwistStamped` commands to `robot.move`: x in m/s, yaw in rad/s,
   positive yaw turning left, lateral command zero.
-- [ ] Enforce conservative speed limits and a command timeout; resend only while
+- [x] Enforce conservative speed limits and a command timeout; resend only while
   a command is fresh. Preserve the daemon's deadman and fallen-state protections.
-- [ ] Expose connection, sensor freshness and enabled/fallen state in diagnostics.
-- [ ] Decide command ownership so teleoperation and autonomous navigation cannot
+- [x] Expose connection, sensor freshness and policy-held/fallen/limp state in diagnostics.
+- [x] Decide command ownership so teleoperation and autonomous navigation cannot
   fight over the same actuator interface.
 
 ### Data contract
@@ -85,26 +85,45 @@ See the [development guide](development.md) and `scripts/check-dev-env`.
 | `/tf`, `/tf_static` | TF messages | Base and sensor transforms, with one publisher per transform |
 | `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | Health and data freshness |
 
-- [ ] Convert scalar-first duck quaternions into ROS quaternion field ordering.
-- [ ] Preserve ToF status semantics: valid return, no target and failed measurement
+- [x] Convert scalar-first duck quaternions into ROS quaternion field ordering.
+- [x] Preserve ToF status semantics: valid return, no target and failed measurement
   are different. Do not turn invalid returns into obstacles or clear space.
-- [ ] Use the daemon's timestamped sensor poses for the moving head.
-- [ ] Start with ROS wall time and a consistent conversion from daemon monotonic
+- [x] Use the daemon's timestamped sensor poses for the moving head.
+- [x] Start with ROS wall time and a consistent conversion from daemon monotonic
   timestamps. Define missing-timestamp behaviour explicitly.
-- [ ] Define meaningful covariance assumptions; do not claim perfect measurements.
-- [ ] Publish `odom -> base_footprint -> base_link -> sensor frames`, preserving
+- [x] Define meaningful covariance assumptions; do not claim perfect measurements.
+- [x] Publish `odom -> base_footprint -> base_link -> sensor frames`, preserving
   trunk height, roll and pitch beneath the planar navigation frame.
-- [ ] Provide a minimal robot representation for visualisation. Avoid duplicating
+- [x] Provide a minimal robot representation for visualisation. Avoid duplicating
   head kinematics already supplied by the daemon.
 
 ### Visualisation and acceptance
 
-- [ ] Add a ROS WebSocket bridge and a saved Lichtblick layout.
-- [ ] Show the robot pose, trajectory, joints, sensor frames and ToF points.
-- [ ] Verify forward motion and positive yaw against the MuJoCo viewer.
-- [ ] Verify stopping on command timeout and bridge disconnect.
-- [ ] Restart bridge and simulator independently and verify reconnect behaviour.
-- [ ] Record a short ROS bag for repeatable sensor/TF inspection.
+- [x] Add a ROS WebSocket bridge and a saved Lichtblick layout.
+- [x] Show the robot pose, trajectory, joints, sensor frames and ToF points.
+- [x] Verify forward motion and positive yaw against MuJoCo measurements.
+- [x] Verify stopping on command timeout and bridge disconnect.
+- [x] Restart bridge and simulator independently and verify reconnect behaviour.
+- [x] Record a short ROS bag for repeatable sensor/TF inspection.
+
+Evidence (4 November 2026): C++ build and package tests passed; isolated fake-daemon
+checks covered expiry, stale/future commands, competing publishers, stale state,
+EOF reconnect, missing timestamps and invalid ToF returns. Live checks from a
+separate container resolved TF at ToF timestamps. MuJoCo measured 0.2058 m forward
+travel and +0.1082 rad yaw during short ROS commands. Stopping the bridge while a
+publisher continued sending commands reduced daemon applied velocity to zero.
+Independent bridge and simulator restarts restored data. A 5.43 s MCAP with 547
+messages is available locally under `.cache/rosbags/milestone-1` (not committed).
+
+Lichtblick 1.30.0 imported the saved layout and rendered live points, skeleton,
+frames, trajectory and joint plots. It reports schema-change alerts for Lyrical's
+`PointField` and `Marker` definitions despite rendering them. See the
+[bridge guide](ros2.md) for startup, commands and this compatibility limitation.
+
+Command ownership currently requires one ROS publisher, with multiple publishers
+inhibiting movement. Direct daemon clients bypass this check and must be stopped
+while ROS owns control. Covariances are explicit provisional assumptions, awaiting
+measurement during milestone 2; they are not calibrated uncertainty estimates.
 
 Complete when ROS teleoperation controls the existing duck, the sensor geometry
 matches MuJoCo, and Lichtblick shows live data without transform/time errors.
@@ -160,7 +179,7 @@ it reliably, and navigation state agrees between ROS and MuJoCo.
 
 | Decision | Starting position | Resolve by |
 | --- | --- | --- |
-| Bridge implementation | Python/rclpy for the existing JSON-RPC interfaces | Milestone 1 package creation |
+| Bridge implementation | C++/rclcpp for the existing JSON-RPC interfaces | Agreed for milestone 1 |
 | TF/robot representation | Minimal geometry; consume published sensor poses | First visualisation |
 | Mapping sensor | Evaluate existing ToF; synthetic lidar is an explicit development aid | Milestone 2 recordings |
 | Mapping/localisation packages | Select after sensor evaluation | Milestone 2 |

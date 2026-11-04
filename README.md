@@ -83,3 +83,10 @@ logging in again, recreate the service with `docker compose up -d --force-recrea
 
 Build caches and state survive `docker compose down`. `docker compose down -v`
 also removes those volumes, including downloaded policies and simulated identities.
+
+## ROS 2 development
+
+See the [ROS bridge and Lichtblick guide](docs/ros2.md) for velocity control and
+sensor visualisation, the [Helix development guide](docs/development.md) for
+editing and building C++, and the [integration roadmap](docs/ros2-roadmap.md)
+for the staged mapping and Nav2 work.

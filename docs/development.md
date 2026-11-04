@@ -115,8 +115,8 @@ container shares the existing socket and Rust build volumes:
 podman-compose --profile dev run --rm dev robotctl health
 ```
 
-This is the existing daemon CLI. ROS topics and Nav2 are still tracked as future
-work in the [integration roadmap](ros2-roadmap.md).
+This is the existing daemon CLI. See the [ROS bridge guide](ros2.md) for ROS control
+and Lichtblick, and the [integration roadmap](ros2-roadmap.md) for Nav2 work.
 
 ## References
 
