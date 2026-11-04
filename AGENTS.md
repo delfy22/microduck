@@ -11,6 +11,7 @@
   updates.
 - Keep dependencies deliberate. Reuse existing facilities before adding another
   dependency or abstraction.
+- Prefer C++ implementations over Python, particularly for ROS nodes.
 
 ## Commits and validation
 
