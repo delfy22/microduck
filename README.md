@@ -38,6 +38,31 @@ docker compose exec sim cargo build --locked -p robotd -p robotctl
 docker compose exec sim bash
 ```
 
+To control the running duck from a separate, temporary container:
+
+```bash
+docker compose run --rm sim bash
+robotctl health
+robotctl robot look 1 0.5 0
+robotctl robot do sit_toggle
+scripts/duck-sim drive 0.15 0
+exit
+```
+
+Start the simulation service with `up -d` first. The temporary container shares
+the simulation's socket volume and build artifacts. Its `robotctl` wrapper selects
+the shared sockets and simulator params, so the usual CLI commands work directly.
+Exiting this shell removes the temporary container and leaves the duck running.
+The same `robotctl` wrapper is available through `compose exec`.
+
+Other client services can connect to `/var/lib/duck-sim/duck-a.sock` by mounting
+the `sim-state` volume there and using compatible socket permissions. No network
+gateway is needed for this local JSON-RPC connection. Helpers such as
+`scripts/duck-sim drive`, `status` and `realtime` also query MuJoCo at `sim:7801`
+on the Compose network. The body listens on the container's network interfaces;
+no host port is published. `drive` is a launcher helper, so run
+`scripts/duck-sim drive`, not `scripts/duck-sim ctl drive` or `robotctl drive`.
+
 Python contains the body server's dependencies, pinned from the RL `uv.lock`,
 rather than the training environment. Rebuild the image after changing dependency
 locks. The GPU accelerates the viewer; physics and the Rust control loop

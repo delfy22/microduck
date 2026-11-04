@@ -38,5 +38,6 @@ RUN printf '%s\n' 'deb http://deb.debian.org/debian bookworm-backports main' \
 RUN ln -s /workspace/3rd_party/microduck_rl/src /opt/microduck_rl/src
 ENV PATH=/opt/microduck_rl/.venv/bin:$PATH
 COPY docker/sim-entrypoint.sh /usr/local/bin/sim-entrypoint
+COPY --chmod=755 docker/robotctl /usr/local/bin/robotctl
 ENTRYPOINT ["/usr/bin/tini", "--", "/bin/sh", "/usr/local/bin/sim-entrypoint"]
 CMD ["sim"]

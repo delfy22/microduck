@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+# Use the shared simulation sockets and params rather than the board's /run paths.
+exec /workspace/3rd_party/microduck/scripts/duck-sim ctl "$@"
